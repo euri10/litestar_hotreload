@@ -1,0 +1,146 @@
+import shutil
+from collections.abc import AsyncGenerator, Sequence
+from contextlib import asynccontextmanager
+from functools import partial
+from pathlib import Path
+
+from litestar import Litestar, Router, websocket_stream
+from litestar.config.app import AppConfig
+from litestar.plugins import InitPlugin
+from litestar.template import TemplateConfig
+
+from litestar_hotreload import logger
+from litestar_hotreload._notify import Notify
+from litestar_hotreload._watch import ChangeSet, FileWatcher
+from litestar_hotreload.middleware import HotReloadMiddleware
+
+
+def _make_base_router(
+    reload_path: str,
+) -> tuple[Router, Notify]:
+    # @websocket(path=reload_path)
+    # async def _reload_handler(socket: WebSocket) -> None:
+    #     await socket.accept()
+    #     tasks = [
+    #         asyncio.create_task(_watch_reloads(socket)),
+    #         asyncio.create_task(_wait_client_disconnect(socket)),
+    #     ]
+    #     (done, pending) = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    #     logger.info(f"Done: {done}")
+    #     logger.info(f"Pending: {pending}")
+    #     logger.info("Cancelling pending tasks")
+    #     [task.cancel() for task in pending]
+    #     [task.result() for task in done]
+
+    # async def _watch_reloads(socket: WebSocket) -> None:
+    #     logger.info("Watching for reloads")
+    #     async for _ in _notify.watch():
+    #         logger.info("sending reload to ws")
+    #         await socket.send_text("reload")
+    #
+    # async def _wait_client_disconnect(socket: WebSocket) -> None:
+    #     logger.info("Waiting for client disconnect")
+    #     async for _ in socket.iter_data("text"):
+    #         logger.info(_)
+    #         pass
+    _notify = Notify()
+
+    @websocket_stream(reload_path)
+    async def _reload_handler() -> AsyncGenerator[str, None]:
+        async for _ in _notify.watch():
+            logger.info("sending reload to ws")
+            yield "reload"
+
+    return Router("/", route_handlers=[_reload_handler]), _notify
+
+
+async def _on_changes(
+    changeset: ChangeSet,
+    *,
+    _notify: Notify,
+    # on_reload
+) -> None:
+    description = ", ".join(
+        f"file {event} at {', '.join(f'{event!r}' for event in changeset[event])}"
+        for event in changeset
+    )
+    logger.warning("Detected %s. Triggering reload...", description)
+
+    # Run server-side hooks first.
+    # for callback in on_reload:
+    #     await callback()
+
+    await _notify.notify()
+
+
+@asynccontextmanager
+async def hotreload_lifespan(
+    _app: Litestar, watch_paths: Sequence[Path], notify: Notify
+) -> AsyncGenerator[None, None]:
+    logger.info("Starting hot reload lifespan")
+    _watchers = [
+        FileWatcher(
+            path,
+            on_change=partial(
+                _on_changes,
+                _notify=notify,
+                # on_reload=on_reload
+            ),
+        )
+        for path in watch_paths
+    ]
+    try:
+        for watcher in _watchers:
+            await watcher.startup()
+    except BaseException as exc:
+        logger.error(f"Error while starting hot reload: {exc}")
+        raise
+    yield
+    try:
+        for watcher in _watchers:
+            await watcher.shutdown()
+    except BaseException as exc:
+        logger.error(
+            f"Error while stopping hot reload: {exc}",
+        )
+        raise
+    logger.info("Stopping hot reload lifespan")
+
+
+class HotReloadPlugin(InitPlugin):
+    def __init__(
+        self,
+        template_config: TemplateConfig,
+        watch_paths: Sequence[Path],
+        ws_reload_path: str = "/__litestar__",
+        reconnect_interval: float = 1.0,
+    ):
+        self.template_config = template_config
+        self.watch_paths = watch_paths
+        if ws_reload_path is not None:
+            self.ws_reload_path = ws_reload_path
+        if reconnect_interval is not None:
+            self.reconnect_interval = reconnect_interval
+
+    def on_app_init(self, app_config: AppConfig) -> AppConfig:
+        # TODO: could switch on engine, we suppose here it's jinja
+        # is there a way NOT to copy the file?
+        hot_reload_js_file = self.template_config.directory / "hotreload.js"  # type: ignore[operator]
+        shutil.copy(
+            Path(__file__).parent / "templates/hotreload.js",
+            hot_reload_js_file,
+        )
+        _router, notify = _make_base_router(self.ws_reload_path)
+        app_config.route_handlers.append(_router)
+        environment = self.template_config.engine_instance.engine
+        app_config.middleware.append(
+            HotReloadMiddleware(
+                reconnect_interval=self.reconnect_interval,
+                ws_path=self.ws_reload_path,
+                environment=environment,
+            )
+        )
+        app_config.lifespan.append(
+            partial(hotreload_lifespan, watch_paths=self.watch_paths, notify=notify)
+        )
+        return app_config

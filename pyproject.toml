@@ -1,0 +1,97 @@
+[project]
+name = "litestar-hotreload"
+version = "0.1.0"
+description = "Hot reload for Litestar development"
+readme = "README.md"
+authors = [
+    { name = "euri10", email = "benoit.barthelet@gmail.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "litestar>=2.15.0",
+    "watchfiles>=1.0.4",
+]
+
+[project.scripts]
+litestar-hotreload = "litestar_hotreload:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "coverage==7.6.12",
+    "jinja2>=3.1.5",
+    "mypy>=1.15.0",
+    "pytest>=8.3.4",
+    "ruff>=0.9.8",
+]
+examples = [
+    "uvicorn[standard]>=0.34.0",
+]
+
+[tool.coverage.run]
+branch = true
+command_line = "-m pytest"
+include = ["src/*", "tests/*"]
+relative_files = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:"
+]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --strict-config"
+xfail_strict = true
+filterwarnings = [
+    "error::DeprecationWarning",
+]
+
+
+
+[tool.ruff.lint]
+select = [
+    "A", # flake8-builtins
+    "ARG", # flake8-unused-arguments
+    "ASYNC", # flake8-async
+    "B", # flake8-bugbear
+    "C4", # flake8-comprehensions
+    #    "D", # pydocstyle
+    #    "ERA", # eradicate
+    #    "E", "W", # pycodestyles
+    "F", # pyflakes
+    "I", # isort
+    "N", # pep8-naming
+    "PIE", # flake8-pie
+    "Q", # flake8-quotes
+    "RET", # flake8-return
+    "RUF", # Ruff-specific rules
+    "S", # flake8-bandit
+    "T20", # flake8-print
+    "UP", # pyupgrade
+    "PLC", # pylint - convention
+    "PLE", # pylint - error
+    "PLW", # pylint - warning
+    "PTH", # flake8-use-pathlib
+    "TCH", # flake8-type-checking
+    "TID", # flake8-tidy-imports
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.*" = [
+    "S101", # flake8-bandit
+]
+
+
+[tool.mypy]
+disallow_untyped_defs = true
+pretty = true
+show_error_codes = true
+warn_unused_ignores = true
+namespace_packages = true
+ignore_missing_imports = true
