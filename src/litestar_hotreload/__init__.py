@@ -1,4 +1,5 @@
-import logging
+"""Hotreload plugin for Litestar framework."""
 
-logger = logging.getLogger("litestar_hotreload")
-logger.addHandler(logging.NullHandler())
+from litestar_hotreload.plugin import HotReloadPlugin
+
+__all__ = ["HotReloadPlugin"]

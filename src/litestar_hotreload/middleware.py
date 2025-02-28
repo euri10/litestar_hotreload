@@ -1,3 +1,6 @@
+"""Middleware to inject hot reload script into HTML responses."""
+
+import logging
 import textwrap
 import warnings
 from typing import cast
@@ -14,10 +17,12 @@ from litestar.types import (
     WebSocketScope,
 )
 
-from litestar_hotreload import logger
+logger = logging.getLogger(__name__)
 
 
 class HotReloadMiddleware(ASGIMiddleware):
+    """Middleware to inject hot reload script into HTML responses."""
+
     def __init__(
         self,
         reconnect_interval: float,
@@ -31,6 +36,7 @@ class HotReloadMiddleware(ASGIMiddleware):
     async def handle(
         self, scope: Scope, receive: Receive, send: Send, next_app: ASGIApp
     ) -> None:
+        """Handle asgi messages."""
         if scope["type"] == "websocket":
             logger.debug(f"Handling websocket scope on path: {scope['path']}")
             if scope["path"] != self._ws_path:
@@ -82,7 +88,7 @@ class HotReloadMiddleware(ASGIMiddleware):
                     msg = textwrap.dedent(
                         f"""
                         Cannot inject reload script into response encoded as {headers[b"content-encoding"]!r}.
-                        """
+                        """  # noqa: E501
                     )
                     warnings.warn(msg, stacklevel=2)
 

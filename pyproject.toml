@@ -24,6 +24,7 @@ dev = [
     "coverage==7.6.12",
     "jinja2>=3.1.5",
     "mypy>=1.15.0",
+    "pre-commit>=4.1.0",
     "pytest>=8.3.4",
     "ruff>=0.9.8",
 ]
@@ -61,9 +62,9 @@ select = [
     "ASYNC", # flake8-async
     "B", # flake8-bugbear
     "C4", # flake8-comprehensions
-    #    "D", # pydocstyle
-    #    "ERA", # eradicate
-    #    "E", "W", # pycodestyles
+    "D", # pydocstyle
+#        "ERA", # eradicate
+    "E", "W", # peycodestyles
     "F", # pyflakes
     "I", # isort
     "N", # pep8-naming
@@ -82,9 +83,18 @@ select = [
     "TID", # flake8-tidy-imports
 ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.*" = [
     "S101", # flake8-bandit
+    "D103", # pydocstyle
+    "D100"
+]
+"examples/**/*.*" = [
+    "D103",
+    "D100"
 ]
 
 

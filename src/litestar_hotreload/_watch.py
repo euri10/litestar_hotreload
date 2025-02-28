@@ -1,11 +1,12 @@
 import asyncio
 import itertools
+import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import watchfiles
 
-from litestar_hotreload import logger
+logger = logging.getLogger(__name__)
 
 ChangeSet = dict[str, list[str]]
 

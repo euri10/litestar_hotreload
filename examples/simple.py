@@ -34,7 +34,7 @@ template_config = TemplateConfig(
 hotreload_plugin = HotReloadPlugin(
     template_config=template_config,
     watch_paths=[Path(__file__).parent / "templates"],
-    ws_reload_path="/reload_custom",  # default is /__litestar__, option is provided in the case you need to avoid a name clash
+    ws_reload_path="/reload_custom",
     reconnect_interval=2.0,
 )
 compression_config = CompressionConfig(backend="gzip", gzip_compress_level=9)

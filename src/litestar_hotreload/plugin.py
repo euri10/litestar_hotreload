@@ -1,3 +1,6 @@
+"""Hot reload plugin for Litestar."""
+
+import logging
 import shutil
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
@@ -9,10 +12,11 @@ from litestar.config.app import AppConfig
 from litestar.plugins import InitPlugin
 from litestar.template import TemplateConfig
 
-from litestar_hotreload import logger
 from litestar_hotreload._notify import Notify
 from litestar_hotreload._watch import ChangeSet, FileWatcher
 from litestar_hotreload.middleware import HotReloadMiddleware
+
+logger = logging.getLogger(__name__)
 
 
 def _make_base_router(
@@ -25,7 +29,7 @@ def _make_base_router(
     #         asyncio.create_task(_watch_reloads(socket)),
     #         asyncio.create_task(_wait_client_disconnect(socket)),
     #     ]
-    #     (done, pending) = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    #     (done, pending) = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)  # noqa: E501
     #     logger.info(f"Done: {done}")
     #     logger.info(f"Pending: {pending}")
     #     logger.info("Cancelling pending tasks")
@@ -77,6 +81,7 @@ async def _on_changes(
 async def hotreload_lifespan(
     _app: Litestar, watch_paths: Sequence[Path], notify: Notify
 ) -> AsyncGenerator[None, None]:
+    """Lifespan asynccontextmanager for hot reload."""
     logger.info("Starting hot reload lifespan")
     _watchers = [
         FileWatcher(
@@ -108,6 +113,8 @@ async def hotreload_lifespan(
 
 
 class HotReloadPlugin(InitPlugin):
+    """A plugin for hot reloading templates and static files."""
+
     def __init__(
         self,
         template_config: TemplateConfig,
@@ -115,6 +122,19 @@ class HotReloadPlugin(InitPlugin):
         ws_reload_path: str = "/__litestar__",
         reconnect_interval: float = 1.0,
     ):
+        """Initialize the HotReloadPlugin.
+
+        Parameters
+        ----------
+        template_config : TemplateConfig
+            The configuration for the template engine.
+        watch_paths : Sequence[Path]
+            A sequence of paths to watch for changes.
+        ws_reload_path : str, optional
+            The WebSocket path for reload notifications. Defaults to "/__litestar__".
+        reconnect_interval : float, optional
+            The interval in seconds to attempt reconnection. Defaults to 1.0.
+        """
         self.template_config = template_config
         self.watch_paths = watch_paths
         if ws_reload_path is not None:
@@ -123,6 +143,7 @@ class HotReloadPlugin(InitPlugin):
             self.reconnect_interval = reconnect_interval
 
     def on_app_init(self, app_config: AppConfig) -> AppConfig:
+        """Configure the app with the hot reload plugin."""
         # TODO: could switch on engine, we suppose here it's jinja
         # is there a way NOT to copy the file?
         hot_reload_js_file = self.template_config.directory / "hotreload.js"  # type: ignore[operator]

@@ -1,8 +1,9 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from litestar_hotreload import logger
+logger = logging.getLogger(__name__)
 
 
 class Notify:
@@ -22,9 +23,7 @@ class Notify:
 
 
 class _MemoryBroadcast:
-    """
-    A basic in-memory pub/sub helper.
-    """
+    """A basic in-memory pub/sub helper."""
 
     class Subscription:
         def __init__(self, queue: asyncio.Queue) -> None:
