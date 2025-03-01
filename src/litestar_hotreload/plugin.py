@@ -130,17 +130,15 @@ class HotReloadPlugin(InitPlugin):
             The configuration for the template engine.
         watch_paths : Sequence[Path]
             A sequence of paths to watch for changes.
-        ws_reload_path : str, optional
+        ws_reload_path : str
             The WebSocket path for reload notifications. Defaults to "/__litestar__".
-        reconnect_interval : float, optional
+        reconnect_interval : float
             The interval in seconds to attempt reconnection. Defaults to 1.0.
         """
         self.template_config = template_config
         self.watch_paths = watch_paths
-        if ws_reload_path is not None:
-            self.ws_reload_path = ws_reload_path
-        if reconnect_interval is not None:
-            self.reconnect_interval = reconnect_interval
+        self.ws_reload_path = ws_reload_path
+        self.reconnect_interval = reconnect_interval
 
     def on_app_init(self, app_config: AppConfig) -> AppConfig:
         """Configure the app with the hot reload plugin."""

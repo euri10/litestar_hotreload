@@ -40,6 +40,7 @@ class HotReloadMiddleware(ASGIMiddleware):
         if scope["type"] == "websocket":
             logger.debug(f"Handling websocket scope on path: {scope['path']}")
             if scope["path"] != self._ws_path:
+                await next_app(cast(WebSocketScope, scope), receive, send)
                 return
             logger.debug("Handling websocket scope")
             await next_app(cast(WebSocketScope, scope), receive, send)

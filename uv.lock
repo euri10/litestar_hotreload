@@ -346,7 +346,7 @@ examples = [
 [package.metadata]
 requires-dist = [
     { name = "litestar", specifier = ">=2.15.0" },
-    { name = "watchfiles", specifier = "==1.0.4" },
+    { name = "watchfiles", specifier = ">=1.0.4" },
 ]
 
 [package.metadata.requires-dev]
