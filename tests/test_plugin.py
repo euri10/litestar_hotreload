@@ -27,6 +27,11 @@ async def test_plugin_default_engine(tmp_path: Path, ws_reload_path: str) -> Non
     index_jinja = templates_dir / "index.html"
     index_jinja.write_text("<body>{{ page_content }}</body>")
 
+    markdown_dir = tmp_path / "markdown"
+    markdown_dir.mkdir()
+    index_md = markdown_dir / "index.md"
+    index_md.write_text("## Hello, world!")
+
     template_config = TemplateConfig(
         engine=JinjaTemplateEngine, directory=templates_dir
     )
@@ -36,16 +41,20 @@ async def test_plugin_default_engine(tmp_path: Path, ws_reload_path: str) -> Non
         page_content = "omg this is a html page"
         return Template("index.html", context={"page_content": page_content})
 
+    @get("/markdown")
+    def render_markdown() -> Response:
+        with Path(index_md).open("r") as f:
+            markdown_content = f.read()
+        return Response(markdown_content, media_type="text/markdown")
+
     hotreload_plugin = HotReloadPlugin(
         template_config=template_config,
-        watch_paths=[templates_dir],
+        watch_paths=[templates_dir, markdown_dir],
         reconnect_interval=0.5,
         ws_reload_path=ws_reload_path,
     )
     app = Litestar(
-        route_handlers=[
-            render_page,
-        ],
+        route_handlers=[render_page, render_markdown],
         debug=True,
         template_config=template_config,
         plugins=[hotreload_plugin],
@@ -61,6 +70,13 @@ async def test_plugin_default_engine(tmp_path: Path, ws_reload_path: str) -> Non
             assert ws.receive_text() == "reload"
         response = await client.get("/")
         assert "modified" in response.text
+
+        with await client.websocket_connect(ws_reload_path) as ws:
+            index_md.write_text("__modified__")
+
+            assert ws.receive_text() == "reload"
+        response = await client.get("/markdown")
+        assert "__modified__" in response.text
 
 
 @pytest.mark.anyio
