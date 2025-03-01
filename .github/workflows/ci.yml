@@ -91,12 +91,3 @@ jobs:
         with:
           pattern: coverage-data*
           merge-multiple: true
-
-      - name: Combine coverage files
-        run: |
-          python -Im pip install coverage covdefaults
-          python -Im coverage combine
-          python -Im coverage xml -i
-
-      - name: Fix coverage file name
-        run: sed -i "s/home\/runner\/work\/litestar\/litestar/github\/workspace/g" coverage.xml
