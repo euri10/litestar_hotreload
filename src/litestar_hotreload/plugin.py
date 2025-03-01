@@ -1,12 +1,12 @@
 """Hot reload plugin for Litestar."""
 
 import logging
-import shutil
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from functools import partial
 from pathlib import Path
 
+from jinja2 import ChoiceLoader, DictLoader
 from litestar import Litestar, Router, websocket_stream
 from litestar.config.app import AppConfig
 from litestar.plugins import InitPlugin
@@ -143,20 +143,27 @@ class HotReloadPlugin(InitPlugin):
     def on_app_init(self, app_config: AppConfig) -> AppConfig:
         """Configure the app with the hot reload plugin."""
         # TODO: could switch on engine, we suppose here it's jinja
-        # is there a way NOT to copy the file?
-        hot_reload_js_file = self.template_config.directory / "hotreload.js"  # type: ignore[operator]
-        shutil.copy(
-            Path(__file__).parent / "templates/hotreload.js",
-            hot_reload_js_file,
+        if self.template_config.directory:
+            environment = self.template_config.engine_instance.engine
+        else:
+            environment = self.template_config.engine_instance
+        with (Path(__file__).parent / "templates" / "hotreload.js").open(
+            "r"
+        ) as template_path:
+            hotreload_template = template_path.read()
+        new_env = environment.overlay(
+            loader=ChoiceLoader(
+                [DictLoader({"hotreload.js": hotreload_template}), environment.loader]
+            )
         )
         _router, notify = _make_base_router(self.ws_reload_path)
         app_config.route_handlers.append(_router)
-        environment = self.template_config.engine_instance.engine
+
         app_config.middleware.append(
             HotReloadMiddleware(
                 reconnect_interval=self.reconnect_interval,
                 ws_path=self.ws_reload_path,
-                environment=environment,
+                environment=new_env,
             )
         )
         app_config.lifespan.append(

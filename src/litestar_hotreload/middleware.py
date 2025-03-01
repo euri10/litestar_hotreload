@@ -5,8 +5,8 @@ import textwrap
 import warnings
 from typing import cast
 
+from jinja2 import Environment
 from litestar.middleware import ASGIMiddleware
-from litestar.template import TemplateEngineProtocol
 from litestar.types import (
     ASGIApp,
     HTTPScope,
@@ -27,7 +27,7 @@ class HotReloadMiddleware(ASGIMiddleware):
         self,
         reconnect_interval: float,
         ws_path: str,
-        environment: TemplateEngineProtocol,
+        environment: Environment,
     ):
         self._reconnect_interval = reconnect_interval
         self._ws_path = ws_path

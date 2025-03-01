@@ -70,8 +70,8 @@ async def test_ws_endpoint_with_plugin(tmp_path: Path) -> None:
         engine=JinjaTemplateEngine, directory=templates_dir
     )
 
-    @websocket_listener("/ws")
-    async def ws(data: str) -> str:
+    @websocket_listener("/reversed_echo")
+    async def reversed_echo(data: str) -> str:
         return data[::-1]
 
     hotreload_plugin = HotReloadPlugin(
@@ -80,13 +80,13 @@ async def test_ws_endpoint_with_plugin(tmp_path: Path) -> None:
         reconnect_interval=0.5,
     )
     app = Litestar(
-        route_handlers=[ws],
+        route_handlers=[reversed_echo],
         debug=True,
         template_config=template_config,
         plugins=[hotreload_plugin],
     )
 
     async with AsyncTestClient(app) as client:
-        with await client.websocket_connect("/ws") as ws:
+        with await client.websocket_connect("/reversed_echo") as ws:
             ws.send("1234")
             assert ws.receive_text() == "4321"
