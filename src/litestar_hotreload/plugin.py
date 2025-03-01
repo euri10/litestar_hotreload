@@ -143,10 +143,7 @@ class HotReloadPlugin(InitPlugin):
     def on_app_init(self, app_config: AppConfig) -> AppConfig:
         """Configure the app with the hot reload plugin."""
         # TODO: could switch on engine, we suppose here it's jinja
-        if self.template_config.directory:
-            environment = self.template_config.engine_instance.engine
-        else:
-            environment = self.template_config.engine_instance
+        environment = self.template_config.engine_instance.engine
         with (Path(__file__).parent / "templates" / "hotreload.js").open(
             "r"
         ) as template_path:
