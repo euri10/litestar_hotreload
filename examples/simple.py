@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import uvicorn
 from litestar import Litestar, Response, get
 from litestar.config.compression import CompressionConfig
 from litestar.contrib.jinja import JinjaTemplateEngine
@@ -51,7 +50,11 @@ app = Litestar(
 )
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "simple:app",
-        reload=True,
-    )
+    pass
+    # uvicorn.run(
+    #     "simple:app",
+    #     reload=True,
+    # )
+    # Granian(
+    #     "simple:app", interface=Interfaces.ASGI, port=5000, reload=True
+    # ).serve()
