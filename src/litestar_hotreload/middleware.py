@@ -87,9 +87,7 @@ class HotReloadMiddleware(ASGIMiddleware):
 
                 if headers.get(b"content-encoding"):
                     msg = textwrap.dedent(
-                        f"""
-                        Cannot inject reload script into response encoded as {headers[b"content-encoding"]!r}.
-                        """  # noqa: E501
+                        f"""Cannot inject reload script into response encoded as {headers[b"content-encoding"]!r}."""  # noqa: E501
                     )
                     warnings.warn(msg, stacklevel=2)
 

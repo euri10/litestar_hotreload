@@ -1,8 +1,11 @@
+import warnings
 from pathlib import Path
 
 import pytest
+from _pytest.recwarn import WarningsRecorder
 from jinja2 import Environment, FileSystemLoader
 from litestar import Litestar, Response, get, websocket_listener
+from litestar.config.compression import CompressionConfig
 from litestar.contrib.jinja import JinjaTemplateEngine
 from litestar.response import Template
 from litestar.template import TemplateConfig
@@ -136,3 +139,50 @@ async def test_ws_endpoint_with_plugin(tmp_path: Path) -> None:
         with await client.websocket_connect("/reversed_echo") as ws:
             ws.send("1234")
             assert ws.receive_text() == "4321"
+
+
+@pytest.mark.anyio
+async def test_plugin_with_compression_warning(
+    tmp_path: Path, recwarn: WarningsRecorder
+) -> None:
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    index_jinja = templates_dir / "index.html"
+    index_jinja.write_text("<body>{{ page_content }}</body>")
+
+    template_config = TemplateConfig(
+        engine=JinjaTemplateEngine, directory=templates_dir
+    )
+
+    @get("/")
+    async def render_page() -> Response:
+        page_content = "omg this is a html page" * 1000
+        return Template("index.html", context={"page_content": page_content})
+
+    compression_config = CompressionConfig("gzip")
+
+    hotreload_plugin = HotReloadPlugin(
+        template_config=template_config,
+        watch_paths=[templates_dir],
+    )
+    app = Litestar(
+        route_handlers=[
+            render_page,
+        ],
+        debug=True,
+        template_config=template_config,
+        plugins=[hotreload_plugin],
+        compression_config=compression_config,
+    )
+
+    async with AsyncTestClient(app) as client:
+        with warnings.catch_warnings():
+            response = await client.get("/")
+            assert "window.location.reload()" not in response.text
+            assert len(recwarn) == 1
+            w = recwarn.pop(UserWarning)
+            assert issubclass(w.category, UserWarning)
+            assert (
+                str(w.message)
+                == "Cannot inject reload script into response encoded as b'gzip'."
+            )
