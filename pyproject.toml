@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "euri10", email = "benoit.barthelet@gmail.com" }
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "litestar>=2.15.0",
     "watchfiles>=1.0.4",

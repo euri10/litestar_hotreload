@@ -1,0 +1,81 @@
+name: Test
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        required: true
+        type: string
+      coverage:
+        required: false
+        type: boolean
+        default: false
+      os:
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      timeout:
+        required: false
+        type: number
+        default: 10
+
+env:
+  UV_LOCKED: 1
+
+jobs:
+  test:
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: ${{ inputs.timeout }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up python ${{ inputs.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      # Linux Source
+      - name: Install Build Dependencies
+        run: sudo apt-get install python3-dev -y
+        if: startsWith(inputs.os, 'ubuntu')
+
+      # MacOS Source
+      - name: Install Build Dependencies
+        run: brew install libpq && brew link --force libpq
+        if: startsWith(inputs.os, 'macos')
+
+      # Windows Source
+      - name: Install Build Dependencies
+        uses: ikalnytskyi/action-setup-postgres@v7
+        if: startsWith(inputs.os, 'windows')
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.6.3"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
+      - name: Test with coverage
+        if: inputs.coverage
+        run: uv run coverage run -m pytest
+
+      - name: Rename coverage file
+        if: inputs.coverage
+        run: mv .coverage .coverage.${{ inputs.python-version }}
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.coverage
+        with:
+          name: coverage-data-${{ inputs.python-version }}
+          path: .coverage.${{ inputs.python-version }}
+          include-hidden-files: true
