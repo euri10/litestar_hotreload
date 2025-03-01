@@ -41,7 +41,7 @@ async def test_plugin_default_engine(tmp_path: Path, ws_reload_path: str) -> Non
         page_content = "omg this is a html page"
         return Template("index.html", context={"page_content": page_content})
 
-    @get("/markdown")
+    @get("/markdown", sync_to_thread=False)
     def render_markdown() -> Response:
         with Path(index_md).open("r") as f:
             markdown_content = f.read()
