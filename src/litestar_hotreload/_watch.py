@@ -17,6 +17,11 @@ CHANGE_EVENT_LABELS = {
 }
 
 
+class TaskError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
 class FileWatcher:
     def __init__(
         self, path: Path, on_change: Callable[[ChangeSet], Awaitable[None]]
@@ -34,7 +39,9 @@ class FileWatcher:
         return self._should_exit_obj
 
     async def _watch(self) -> None:
-        async for changes in watchfiles.awatch(self._path):
+        async for changes in watchfiles.awatch(
+            self._path, stop_event=self._should_exit
+        ):
             changeset: ChangeSet = {}
             for event, group in itertools.groupby(changes, key=lambda item: item[0]):
                 label = CHANGE_EVENT_LABELS[event]
@@ -44,7 +51,6 @@ class FileWatcher:
     async def _main(self) -> None:
         tasks = [
             asyncio.create_task(self._watch()),
-            asyncio.create_task(self._should_exit.wait()),
         ]
         (done, pending) = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         [task.cancel() for task in pending]
@@ -52,13 +58,13 @@ class FileWatcher:
 
     async def startup(self) -> None:
         if self._task is not None:
-            raise RuntimeError("Already started.")
+            raise RuntimeError("Task already started.")  # noqa: TRY003
         self._task = asyncio.create_task(self._main())
         logger.info(f"Started watching file changes at {self._path!r}")
 
     async def shutdown(self) -> None:
         if self._task is None:
-            raise RuntimeError("Was not started.")
+            raise RuntimeError("Task was not started.")  # noqa: TRY003
 
         logger.info("Stopping file watching...")
         self._should_exit.set()

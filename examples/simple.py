@@ -50,11 +50,13 @@ app = Litestar(
 )
 
 if __name__ == "__main__":
-    pass
-    # uvicorn.run(
-    #     "simple:app",
-    #     reload=True,
-    # )
+    import uvicorn
+
+    uvicorn.run(
+        "simple:app",
+        reload=True,
+    )
+    # import granian
     # Granian(
     #     "simple:app", interface=Interfaces.ASGI, port=5000, reload=True
     # ).serve()

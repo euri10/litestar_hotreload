@@ -97,16 +97,16 @@ async def hotreload_lifespan(
     try:
         for watcher in _watchers:
             await watcher.startup()
-    except BaseException as exc:
-        logger.error(f"Error while starting hot reload: {exc}")
+    except Exception:
+        logger.exception("Error while starting hot reload")
         raise
     yield
     try:
         for watcher in _watchers:
             await watcher.shutdown()
-    except BaseException as exc:
-        logger.error(
-            f"Error while stopping hot reload: {exc}",
+    except Exception:
+        logger.exception(
+            "Error while stopping hot reload",
         )
         raise
     logger.info("Stopping hot reload lifespan")
