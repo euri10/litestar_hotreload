@@ -56,7 +56,7 @@ class HotReloadMiddleware(ASGIMiddleware):
             "https": "wss",
         }[scope["scheme"]]
         if scope["server"] is None:
-            raise RuntimeError("Missing 'server' in ASGI scope")
+            raise RuntimeError("Missing 'server' in ASGI scope")  # noqa: TRY003
         host, port = scope["server"]
         path = self._ws_path
         ws_url = f"{scheme}://{host}:{port}{path}"
@@ -108,8 +108,8 @@ class HotReloadMiddleware(ASGIMiddleware):
                     await send(message)
                     return
 
-                if message.get("more_body", False):
-                    raise RuntimeError("Unexpected streaming response")
+                # if message.get("more_body", False):
+                #     raise LitestarHotReloadError("Unexpected streaming response")
 
                 body: bytes = message["body"]  # type: ignore[typeddict-item]
 

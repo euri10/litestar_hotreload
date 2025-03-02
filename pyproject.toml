@@ -79,6 +79,7 @@ select = [
     "PTH", # flake8-use-pathlib
     "TCH", # flake8-type-checking
     "TID", # flake8-tidy-imports
+    "TRY", # tryceratops
 ]
 
 [tool.ruff.lint.pydocstyle]
