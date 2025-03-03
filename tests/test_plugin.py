@@ -7,9 +7,10 @@ from jinja2 import Environment, FileSystemLoader
 from litestar import Litestar, Response, get, websocket_listener
 from litestar.config.compression import CompressionConfig
 from litestar.contrib.jinja import JinjaTemplateEngine
+from litestar.handlers import HTTPRouteHandler, WebsocketListenerRouteHandler
 from litestar.response import Template
 from litestar.template import TemplateConfig
-from litestar.testing import AsyncTestClient
+from litestar.testing import AsyncTestClient, create_async_test_client
 
 from litestar_hotreload.plugin import HotReloadPlugin
 
@@ -19,26 +20,33 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-@pytest.mark.anyio
-@pytest.mark.parametrize("ws_reload_path", ["/__litestar__", "/custom_reload_path"])
-async def test_plugin_default_engine(tmp_path: Path, ws_reload_path: str) -> None:
+LitestarHotReloadTestFactory = tuple[
+    Path,
+    Path,
+    Path,
+    Path,
+    HTTPRouteHandler,
+    HTTPRouteHandler,
+    WebsocketListenerRouteHandler,
+]
+
+
+@pytest.fixture
+def _setup(
+    tmp_path: Path,
+) -> LitestarHotReloadTestFactory:
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()
     index_jinja = templates_dir / "index.html"
     index_jinja.write_text("<body>{{ page_content }}</body>")
-
     markdown_dir = tmp_path / "markdown"
     markdown_dir.mkdir()
     index_md = markdown_dir / "index.md"
     index_md.write_text("## Hello, world!")
 
-    template_config = TemplateConfig(
-        engine=JinjaTemplateEngine, directory=templates_dir
-    )
-
     @get("/")
-    async def render_page() -> Response:
-        page_content = "omg this is a html page"
+    async def render_page(i: int = 1) -> Response:
+        page_content = "omg this is a html page" * i
         return Template("index.html", context={"page_content": page_content})
 
     @get("/markdown", sync_to_thread=False)
@@ -47,20 +55,53 @@ async def test_plugin_default_engine(tmp_path: Path, ws_reload_path: str) -> Non
             markdown_content = f.read()
         return Response(markdown_content, media_type="text/markdown")
 
+    @websocket_listener("/reversed_echo")
+    async def reversed_echo(data: str) -> str:
+        return data[::-1]
+
+    return (
+        index_jinja,
+        templates_dir,
+        index_md,
+        markdown_dir,
+        render_markdown,
+        render_page,
+        reversed_echo,
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("ws_reload_path", ["/__litestar__", "/custom_reload_path"])
+async def test_plugin_default_engine(
+    _setup: LitestarHotReloadTestFactory, ws_reload_path: str
+) -> None:
+    (
+        index_jinja,
+        templates_dir,
+        index_md,
+        markdown_dir,
+        render_markdown,
+        render_page,
+        reversed_echo,
+    ) = _setup
+
+    template_config = TemplateConfig(
+        engine=JinjaTemplateEngine, directory=templates_dir
+    )
+
     hotreload_plugin = HotReloadPlugin(
         template_config=template_config,
         watch_paths=[templates_dir, markdown_dir],
         reconnect_interval=0.5,
         ws_reload_path=ws_reload_path,
     )
-    app = Litestar(
+
+    async with create_async_test_client(
         route_handlers=[render_page, render_markdown],
         debug=True,
         template_config=template_config,
         plugins=[hotreload_plugin],
-    )
-
-    async with AsyncTestClient(app) as client:
+    ) as client:
         response = await client.get("/")
         assert "window.location.reload()" in response.text
 
@@ -81,21 +122,23 @@ async def test_plugin_default_engine(tmp_path: Path, ws_reload_path: str) -> Non
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("ws_reload_path", ["/__litestar__", "/custom_reload_path"])
-async def test_plugin_non_default_engine(tmp_path: Path, ws_reload_path: str) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
-    index_jinja = templates_dir / "index.html"
-    index_jinja.write_text("<body>{{ page_content }}</body>")
+async def test_plugin_non_default_engine(
+    _setup: LitestarHotReloadTestFactory, ws_reload_path: str
+) -> None:
+    (
+        index_jinja,
+        templates_dir,
+        index_md,
+        markdown_dir,
+        render_markdown,
+        render_page,
+        reversed_echo,
+    ) = _setup
 
     environment = Environment(loader=FileSystemLoader(templates_dir), autoescape=True)
     template_config = TemplateConfig(
         instance=JinjaTemplateEngine.from_environment(environment),
     )
-
-    @get("/")
-    async def render_page() -> Response:
-        page_content = "omg this is a html page"
-        return Template("index.html", context={"page_content": page_content})
 
     hotreload_plugin = HotReloadPlugin(
         template_config=template_config,
@@ -103,16 +146,13 @@ async def test_plugin_non_default_engine(tmp_path: Path, ws_reload_path: str) ->
         reconnect_interval=0.5,
         ws_reload_path=ws_reload_path,
     )
-    app = Litestar(
-        route_handlers=[
-            render_page,
-        ],
+
+    async with create_async_test_client(
+        route_handlers=[render_page, render_markdown],
         debug=True,
         template_config=template_config,
         plugins=[hotreload_plugin],
-    )
-
-    async with AsyncTestClient(app) as client:
+    ) as client:
         response = await client.get("/")
         assert "window.location.reload()" in response.text
 
@@ -125,19 +165,22 @@ async def test_plugin_non_default_engine(tmp_path: Path, ws_reload_path: str) ->
 
 
 @pytest.mark.anyio
-async def test_ws_endpoint_with_plugin(tmp_path: Path) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
-    index_jinja = templates_dir / "index.html"
-    index_jinja.write_text("<body>{{ page_content }}</body>")
+async def test_ws_endpoint_with_plugin(
+    _setup: LitestarHotReloadTestFactory,
+) -> None:
+    (
+        index_jinja,
+        templates_dir,
+        index_md,
+        markdown_dir,
+        render_markdown,
+        render_page,
+        reversed_echo,
+    ) = _setup
 
     template_config = TemplateConfig(
         engine=JinjaTemplateEngine, directory=templates_dir
     )
-
-    @websocket_listener("/reversed_echo")
-    async def reversed_echo(data: str) -> str:
-        return data[::-1]
 
     hotreload_plugin = HotReloadPlugin(
         template_config=template_config,
@@ -159,21 +202,20 @@ async def test_ws_endpoint_with_plugin(tmp_path: Path) -> None:
 
 @pytest.mark.anyio
 async def test_plugin_with_compression_warning(
-    tmp_path: Path, recwarn: WarningsRecorder
+    _setup: LitestarHotReloadTestFactory, recwarn: WarningsRecorder
 ) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
-    index_jinja = templates_dir / "index.html"
-    index_jinja.write_text("<body>{{ page_content }}</body>")
-
+    (
+        index_jinja,
+        templates_dir,
+        index_md,
+        markdown_dir,
+        render_markdown,
+        render_page,
+        reversed_echo,
+    ) = _setup
     template_config = TemplateConfig(
         engine=JinjaTemplateEngine, directory=templates_dir
     )
-
-    @get("/")
-    async def render_page() -> Response:
-        page_content = "omg this is a html page" * 1000
-        return Template("index.html", context={"page_content": page_content})
 
     compression_config = CompressionConfig("gzip")
 
@@ -193,7 +235,7 @@ async def test_plugin_with_compression_warning(
 
     async with AsyncTestClient(app) as client:
         with warnings.catch_warnings():
-            response = await client.get("/")
+            response = await client.get("/?i=1000")
             assert "window.location.reload()" not in response.text
             assert len(recwarn) == 1
             w = recwarn.pop(UserWarning)
